@@ -17,7 +17,7 @@ try:
         user=DB_USER,
         password=DB_PASSWORD
     )
-    cursor = db.cursor()
+    cursor = db.cursor(dictionary=True)
     print("✅ Connected to MySQL!")
 except mysql.connector.Error as err:
     print(f"❌ Error connecting to MySQL: {err}")
@@ -39,7 +39,7 @@ db = mysql.connector.connect(
     password=DB_PASSWORD,
     database=DB_NAME
 )
-cursor = db.cursor()
+cursor = db.cursor(dictionary=True)
 
 def setup_database():
     """Function to migrate database tables."""
@@ -103,31 +103,15 @@ def save_order_history(order):
     cursor.execute(sql, values)
     db.commit()
 
-def get_latest_order(symbol):
+def get_latest_order_history_stopmarket_status(symbol):
     query = """
-    SELECT * FROM orders_system_histories 
-    WHERE symbol = %s 
+    SELECT * FROM order_history 
+    WHERE symbol = %s AND type = "STOP_MARKET"
     ORDER BY created_at DESC 
     LIMIT 1
     """
     cursor.execute(query, (symbol,))
     return cursor.fetchone()
-
-def insert_order_if_needed(symbol, decision_type, price)-> bool:
-    latest_order = get_latest_order(symbol)
-    flag = False
-
-    if not latest_order or latest_order["type"] != decision_type:
-        query = """
-        INSERT INTO orders_system_histories (symbol, type, price) 
-        VALUES (%s, %s, %s)
-        """
-        cursor.execute(query, (symbol, decision_type, price))
-        db.commit()
-        flag = True
-        print(f"✅ New order inserted: {symbol} - {decision_type} - {price}")
-        
-    return flag
 
 def update_order_status(symbol, status):
     try:
@@ -166,17 +150,6 @@ def handle_new_order(order):
         print(f"❌ Error updating order status: {e}")
 
 
-def get_current_status(symbol):
-    try:
-        cursor.execute("SELECT status FROM orders WHERE symbol = %s", (symbol,))
-        result = cursor.fetchone()
-        current_status = result["status"] if result else None
-        return current_status
-    except mysql.connector.Error as err:
-        print(f"❌ Lỗi DB khi lấy trạng thái: {err}")
-        return
-    
-
 def store_step_size(data):
     for s in data["symbols"]:
         symbol = s["symbol"]
@@ -203,4 +176,4 @@ def get_step_size(symbol):
     query = "SELECT step_size FROM symbol_step_sizes WHERE symbol = %s"
     cursor.execute(query, (symbol,))
     result = cursor.fetchone()
-    return float(result[0]) if result else None
+    return float(result["step_size"]) if result else None
