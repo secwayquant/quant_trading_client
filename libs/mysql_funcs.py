@@ -62,8 +62,10 @@ def setup_database():
                 type VARCHAR(20) DEFAULT 'MARKET',
                 quantity DECIMAL(18,8) DEFAULT 0,
                 price DECIMAL(18,8) DEFAULT 0,
+                stop_price DECIMAL(18,8) DEFAULT 0,
                 status VARCHAR(20) DEFAULT 'UNKNOWN',  -- FILLED, CANCELED, PARTIALLY_FILLED
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             );
             """,
             """
@@ -88,7 +90,7 @@ def setup_database():
 
 def save_order_history(order):
     sql = """
-        INSERT INTO order_history (symbol, order_id, side, type, quantity, price, status)
+        INSERT INTO order_history (symbol, order_id, side, type, quantity, price, stop_price, status)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
     values = (
@@ -98,6 +100,7 @@ def save_order_history(order):
         order.get("type") or "MARKET",
         float(order.get("origQty") or 0),
         float(order.get("price") or 0),
+        float(order.get("stop_price") or 0),
         order.get("status") or "UNKNOWN",
     )
     cursor.execute(sql, values)
@@ -152,6 +155,7 @@ def close_position(symbol):
     update_order_status(symbol, "CLOSED")
     
 def handle_new_order(order):
+    print("Vao handle new order")
     try:
         save_order_history(order) 
     except Exception as e:
@@ -203,4 +207,5 @@ def get_step_size(symbol):
     query = "SELECT step_size FROM symbol_step_sizes WHERE symbol = %s"
     cursor.execute(query, (symbol,))
     result = cursor.fetchone()
-    return float(result["step_size"]) if result else None
+    
+    return float(result[0]) if result else None

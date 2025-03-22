@@ -145,18 +145,55 @@ def handle_signal(symbol, signal, current_price):
 
     print("❌ [ERROR] Invalid signal!")
     
+def calculate_stoploss(current_price, leverage: float = 20, loss_percent: float = 80, side: str = "BUY") -> float:
+    current_price = float(current_price)
+    adverse_move = (loss_percent / 100) / leverage 
     
-def created_order(symbol, side, quantity):
+    if side == "BUY":
+        stoploss = current_price * (1 - adverse_move)
+    elif side == "SELL":
+        stoploss = current_price * (1 + adverse_move)
+    else:
+        raise ValueError("Side must be either 'long' or 'short'")
+    
+    return stoploss
+
+def adjust_precision(value, step_size):
+    step_str = f"{step_size:.10f}"
+    if '.' in step_str:
+        decimals = step_str.split('.')[1].rstrip('0')
+        precision = len(decimals)
+    else:
+        precision = 0
+    return round(value, precision)
+
+
+def created_order(symbol, side, quantity, stopPrice):
     order = None
     try:
         order = client.new_order(
             symbol=symbol,
             side=side,
             type="MARKET",
-            quantity=quantity
+            quantity=quantity,
         )
     except Exception as e:
-        print(e)
+        print(f"new_order {e}")
+        return None
+        
+    # SL
+    try:
+        stop_side = "SELL" if side == "BUY" else "BUY"
+        stop_order = client.new_order(
+            symbol=symbol,
+            side=stop_side,
+            type="STOP_MARKET",
+            quantity=quantity,
+            stopPrice=stopPrice
+        )
+        print(f"✅ Stop order created: {stop_order}")
+    except Exception as e:
+        print(f"SL error {e}")
         
     if order:
         print(order)
@@ -164,10 +201,11 @@ def created_order(symbol, side, quantity):
             order_info = client.get_orders(symbol=symbol, orderId=order.get("orderId"))
             filled_price = float(order_info["avgPrice"])
             order["price"] = filled_price
+            order["stop_price"] = stopPrice
 
             handle_new_order(order)
         except Exception as e:
-            print(e)
+            print(f"handle_new_order {e}")
     
     return order
 
@@ -193,7 +231,10 @@ def count_quantity(investment_usd, current_price, symbol, leverage=20):
         print(f"❌ Insufficient funds! Balance: {usdt_balance} USDT, required: {investment_usd} USDT")
         return
 
-    step_size = get_step_size(symbol)
+    try:
+        step_size = get_step_size(symbol)
+    except Exception as e:
+        print(f"step_size {e}")
     
     quantity = (investment_usd * leverage) / current_price
     rquantity = max(math.floor(quantity / step_size) * step_size, step_size)
@@ -203,7 +244,7 @@ def count_quantity(investment_usd, current_price, symbol, leverage=20):
         return
     
     print(f"✅ Calculated Quantity: {rquantity}")
-    return rquantity
+    return rquantity, step_size
 
 def closed_current_position(symbol):
     try:

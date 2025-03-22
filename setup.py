@@ -9,4 +9,4 @@ from libs.trade import init_step_size
 
 if __name__ == "__main__":
     setup_database()
-    init_step_size()
+    # init_step_size()

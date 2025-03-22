@@ -11,7 +11,7 @@ INVESTMENT_USD = os.getenv("INVESTMENT_USD", 10)
 import sys
 project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_path)
-from libs.trade import closed_current_position, created_order, count_quantity
+from libs.trade import closed_current_position, created_order, count_quantity, calculate_stoploss, adjust_precision
 
 
 async def listen():
@@ -37,24 +37,37 @@ async def listen():
                         try:
                             print("Closed")
                             closed_current_position(symbol)
+                            # Close SL order luon
                         except Exception as e:
                             print(f"closed_current_position {e}")
                         
                         if decision != "CLOSED":
                             try:
-                                quantity = count_quantity(INVESTMENT_USD, current_price, symbol)
+                                quantity, step_size = count_quantity(INVESTMENT_USD, current_price, symbol)
+                                print(quantity)
                             except Exception as e:
                                 print(f"count_quantity {e}")
                                 quantity = 0
-                                
-                            print(f'quantity {quantity} {INVESTMENT_USD}')
+                                step_size = 0
                                 
                             try:
-                                order = created_order(symbol, decision, quantity)
+                                stopPrice = calculate_stoploss(current_price=current_price, side=decision)
+                                try:
+                                    stopPrice  = adjust_precision(stopPrice, step_size)
+                                except Exception as e:
+                                    print(f'stop_price {e}')
+                                    
+                            except Exception as e:
+                                print(f"calculate_stoploss {e}")
+                                stopPrice = 0
+                                return
+                                
+                            try:
+                                order = created_order(symbol, decision, quantity, stopPrice)
                             except Exception as e:
                                 print(f"created_order {e}")
                         
-                    print(f"Symbol: {symbol}, Current Price: {current_price}, Decision: {decision}")
+                            print(f"Symbol: {symbol}, Current Price: {current_price}, Decision: {decision} stopPrice {stopPrice}")
                 except json.JSONDecodeError as e:
                     print(f"Error decoding JSON: {e}")
         except websockets.exceptions.ConnectionClosed as e:
