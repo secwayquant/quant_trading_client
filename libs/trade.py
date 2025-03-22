@@ -193,7 +193,11 @@ def count_quantity(investment_usd, current_price, symbol, leverage=20):
         print(f"❌ Insufficient funds! Balance: {usdt_balance} USDT, required: {investment_usd} USDT")
         return
 
-    step_size = get_step_size(symbol)
+    try:
+        step_size = get_step_size(symbol)
+    except Exception as e:
+        print(f"Step size get error {e}")
+        return
     
     quantity = (investment_usd * leverage) / current_price
     rquantity = max(math.floor(quantity / step_size) * step_size, step_size)

@@ -203,4 +203,4 @@ def get_step_size(symbol):
     query = "SELECT step_size FROM symbol_step_sizes WHERE symbol = %s"
     cursor.execute(query, (symbol,))
     result = cursor.fetchone()
-    return float(result["step_size"]) if result else None
+    return float(result[0]) if result else None
